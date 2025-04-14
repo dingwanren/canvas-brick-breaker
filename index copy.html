@@ -215,12 +215,19 @@
             dy = -dy;
             ballColor = getRandomColor();
         } 
-        // 底部区域碰撞检测（分为挡板区域和死亡区域）
-        else if (y + dy > canvas.height - ballRadius - paddleHeight - paddleBottomOffset) {
-            // 挡板碰撞检测
-            if (x > paddleX && x < paddleX + paddleWidth) {
+        // 底部区域碰撞检测
+        else if (y + dy > canvas.height - ballRadius) {
+            // 游戏结束
+            alert("GAME OVER");
+            document.location.reload();
+        }
+        // 挡板碰撞检测（只在球接近挡板高度时检测）
+        else if (y + dy > canvas.height - paddleHeight - paddleBottomOffset - ballRadius && 
+                 y - dy < canvas.height - paddleBottomOffset + ballRadius) {
+            // 只有当球确实碰到挡板时才反弹
+            if (x > paddleX - ballRadius && x < paddleX + paddleWidth + ballRadius) {
                 // 计算球碰到挡板的相对位置（-1到1之间）
-                const hitPosition = (x - paddleX) / paddleWidth * 2 - 1;
+                const hitPosition = ((x - paddleX) / paddleWidth * 2 - 1);
                 
                 // 根据碰撞位置改变反弹角度
                 const angle = hitPosition * Math.PI/3; // 最大60度角
@@ -237,12 +244,10 @@
                 dx *= 1.05;
                 dy *= 1.05;
                 
+                // 确保球反弹后位于挡板上方
+                y = canvas.height - paddleHeight - paddleBottomOffset - ballRadius - 1;
+                
                 ballColor = getRandomColor();
-            } 
-            // 球落到挡板下方（死亡区域）
-            else if (y + dy > canvas.height - ballRadius) {
-                alert("GAME OVER");
-                document.location.reload();
             }
         }
 
@@ -261,5 +266,5 @@
       // 开始游戏
       draw();
     </script>
-  </body>
+</body>
 </html>
