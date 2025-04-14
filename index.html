@@ -1,0 +1,263 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Gamedev Canvas Workshop</title>
+    <style>
+      * {
+        padding: 0;
+        margin: 0;
+      }
+      canvas {
+        background: #eee;
+        display: block;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="myCanvas" width="480" height="320"></canvas>
+
+    <script>
+      // JavaScript code goes here
+      var canvas = document.getElementById("myCanvas");
+      var ctx = canvas.getContext("2d");
+      var x = canvas.width / 2;
+      var y = canvas.height - 30;
+      var dx = 2;// 目前碰撞之后角度变化永远是45,135,90, todo:可有更细的角度
+      var dy = -2;
+      var ballRadius = 10; //球半径
+      var ballColor = "#0095DD"; // 初始颜色
+
+      // 球板
+      var paddleHeight = 10;
+      var paddleWidth = 75;
+      var paddleX = (canvas.width - paddleWidth) / 2;
+
+      var rightPressed = false;
+      var leftPressed = false;
+
+      var brickRowCount = 3;
+      var brickColumnCount = 5;
+      var brickWidth = 75;
+      var brickHeight = 20;
+      var brickPadding = 10;
+      var brickOffsetTop = 30;
+      var brickOffsetLeft = 30;
+      var score = 0;
+      // 定义挡板离底部的距离
+      const paddleBottomOffset = 30; // 挡板离底部30像素
+      var bricks = [];
+      for (c = 0; c < brickColumnCount; c++) {
+        bricks[c] = [];
+        for (r = 0; r < brickRowCount; r++) {
+          bricks[c][r] = { x: 0, y: 0, status: 1 }; // 0 代表砖被击中
+        }
+      }
+      function drawBricks() {
+        for (c = 0; c < brickColumnCount; c++) {
+          for (r = 0; r < brickRowCount; r++) {
+            if (bricks[c][r].status == 1) {
+              var brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+              var brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+
+              bricks[c][r].x = brickX;
+              bricks[c][r].y = brickY;
+              ctx.beginPath();
+              ctx.rect(brickX, brickY, brickWidth, brickHeight);
+              ctx.fillStyle = "#0095DD";
+              ctx.fill();
+              ctx.closePath();
+            }
+          }
+        }
+      }
+      function collisionDetection() {
+        for (c = 0; c < brickColumnCount; c++) {
+          for (r = 0; r < brickRowCount; r++) {
+            var b = bricks[c][r];
+            
+            // 要处理球半径吗
+            if (b.status == 1) {
+              if (
+                // x + ballRadius > b.x &&
+                // x - ballRadius< b.x + brickWidth &&
+                // y + ballRadius> b.y &&
+                // y - ballRadius < b.y + brickHeight
+                x > b.x &&
+                x < b.x + brickWidth &&
+                y > b.y &&
+                y < b.y + brickHeight
+              ) {
+                dy = -dy;
+                b.status = 0;
+                ballColor = getRandomColor();
+                score++;
+
+                if (score == brickRowCount * brickColumnCount) {
+                  alert("YOU WIN, CONGRATULATIONS!");
+                  document.location.reload();
+                }
+              }
+            }
+          }
+        }
+      }
+      function drawScore() {
+        ctx.font = "16px Arial";
+        ctx.fillStyle = "#0095DD";
+        ctx.fillText("Score: " + score, 8, 20);
+      }
+
+      document.addEventListener("keydown", keyDownHandler, false);
+      document.addEventListener("keyup", keyUpHandler, false);
+      function keyDownHandler(e) {
+        if (e.key == 'ArrowRight') {
+          rightPressed = true;
+        } else if (e.key == 'ArrowLeft') {
+          leftPressed = true;
+        }
+      }
+
+      function keyUpHandler(e) {
+        if (e.key == 'ArrowRight') {
+          rightPressed = false;
+        } else if (e.key == 'ArrowLeft') {
+          leftPressed = false;
+        }
+      }
+
+      // 新增：随机颜色函数
+      function getRandomColor() {
+        var letters = '0123456789ABCDEF';
+        var color = '#';
+        for (var i = 0; i < 6; i++) {
+          color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+      }
+      function drawBall() {
+        ctx.beginPath();
+        ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+        ctx.fillStyle = ballColor
+        ctx.fill();
+        ctx.closePath();
+      }
+
+      function drawPaddle() {
+        ctx.beginPath();
+        ctx.rect(paddleX, canvas.height - paddleHeight - paddleBottomOffset, paddleWidth, paddleHeight);
+        ctx.fillStyle = "#0095DD";
+        ctx.fill();
+        ctx.closePath();
+      }
+/**
+      function draw() {
+        // 每次画之前先清空画布
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBricks() // todo:尝试在行或列上改变砖块数量，或者它们的位置。
+        drawBall()
+        drawPaddle()
+        drawScore()
+        collisionDetection()
+
+        // 左右碰撞, 反转x轴运动
+        if(x + dx > canvas.width - ballRadius || x + dx < ballRadius) {
+          dx = -dx;
+          ballColor = getRandomColor();
+        }
+        // 顶部碰撞,反转 y 轴运动而离开边缘,球的中心里边缘的距离等于半径时就反转,这样看上去就是球外侧碰边反弹
+        if(y + dy < ballRadius) {
+          dy = -dy;
+          ballColor = getRandomColor();
+        } else if (y + dy > canvas.height - ballRadius- paddleHeight) { // 到底部,游戏结束
+          // bug: 球从球板的直角出碰撞,会在版中平移
+          if (
+            x > paddleX &&
+            x < paddleX + paddleWidth
+          ) { //todo: 当球碰到球拍时，让球移动得更快
+            dy = -dy;
+          } else if (y + dy > canvas.height - ballRadius) {
+            alert("GAME OVER");
+            // clearInterval(interval)
+            document.location.reload(); // todo: 手动加个开始的画面,不要刷新页面
+          }
+        }
+
+        if (rightPressed && paddleX < canvas.width - paddleWidth) {
+          paddleX += 7;
+        } else if (leftPressed && paddleX > 0) {
+          paddleX -= 7;
+        }
+        x += dx;
+        y += dy;
+        requestAnimationFrame(draw);
+      }
+**/
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBricks();
+        drawBall();
+        drawPaddle();
+        drawScore();
+        collisionDetection();
+
+        // 左右墙壁碰撞
+        if(x + dx > canvas.width - ballRadius || x + dx < ballRadius) {
+            dx = -dx;
+            ballColor = getRandomColor();
+        }
+        
+        // 顶部碰撞
+        if(y + dy < ballRadius) {
+            dy = -dy;
+            ballColor = getRandomColor();
+        } 
+        // 底部区域碰撞检测（分为挡板区域和死亡区域）
+        else if (y + dy > canvas.height - ballRadius - paddleHeight - paddleBottomOffset) {
+            // 挡板碰撞检测
+            if (x > paddleX && x < paddleX + paddleWidth) {
+                // 计算球碰到挡板的相对位置（-1到1之间）
+                const hitPosition = (x - paddleX) / paddleWidth * 2 - 1;
+                
+                // 根据碰撞位置改变反弹角度
+                const angle = hitPosition * Math.PI/3; // 最大60度角
+                
+                // 计算新的速度向量（保持速度大小不变）
+                const speed = Math.sqrt(dx*dx + dy*dy);
+                dx = speed * Math.sin(angle);
+                dy = -speed * Math.cos(angle);
+                
+                // 确保球不会向下反弹
+                if(dy > 0) dy = -dy;
+                
+                // 增加一点速度以增加难度
+                dx *= 1.05;
+                dy *= 1.05;
+                
+                ballColor = getRandomColor();
+            } 
+            // 球落到挡板下方（死亡区域）
+            else if (y + dy > canvas.height - ballRadius) {
+                alert("GAME OVER");
+                document.location.reload();
+            }
+        }
+
+        // 挡板移动控制
+        if (rightPressed && paddleX < canvas.width - paddleWidth) {
+            paddleX += 7;
+        } else if (leftPressed && paddleX > 0) {
+            paddleX -= 7;
+        }
+        
+        x += dx;
+        y += dy;
+        requestAnimationFrame(draw);
+    }
+    //  var interval = setInterval(draw, 10);  // requestAnimationFrame这个能将帧率让浏览器控制, 比固定10ms一次好
+    draw()
+    </script>
+  </body>
+</html>
