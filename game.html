@@ -1,0 +1,328 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Gamedev Canvas Workshop</title>
+    <style>
+      * {
+        padding: 0;
+        margin: 0;
+      }
+      canvas {
+        background: #eee;
+        display: block;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="myCanvas" width="960" height="640"></canvas>
+
+    <script>
+      // 游戏状态常量
+      const GAME_STATE = {
+        READY: 0,    // 准备开始（显示开始界面）
+        PLAYING: 1,  // 游戏中
+        OVER: 2      // 游戏结束（显示结束界面）
+      };
+
+      // 获取画布和上下文
+      var canvas = document.getElementById("myCanvas");
+      var ctx = canvas.getContext("2d");
+      
+      // 游戏状态控制
+      var gameState = GAME_STATE.READY;
+      var score = 0;
+      var finalScore = 0;
+
+      // 球相关变量
+      var ballRadius = 5;
+      var ballColor = "#0095DD";
+      var x, y, dx, dy; // 将在initBall()中初始化
+
+      // 挡板相关变量
+      var paddleHeight = 10;
+      var paddleWidth = 150;
+      var paddleX = (canvas.width - paddleWidth) / 2;
+      const paddleBottomOffset = 60;
+
+      // 控制状态
+      var rightPressed = false;
+      var leftPressed = false;
+
+      // 砖块相关变量
+      var brickRowCount = 5;
+      var brickColumnCount = 7;
+      var brickWidth = 100;
+      var brickHeight = 20;
+      var brickPadding = 20;
+      var brickOffsetTop = 60;
+      var brickOffsetLeft = 60;
+      var bricks = [];
+
+      // 初始化砖块数组
+      function initBricks() {
+        bricks = [];
+        for (var c = 0; c < brickColumnCount; c++) {
+          bricks[c] = [];
+          for (var r = 0; r < brickRowCount; r++) {
+            bricks[c][r] = { x: 0, y: 0, status: 1 };
+          }
+        }
+      }
+
+      // 初始化球的位置和速度
+      function initBall() {
+        // 球初始位置（居中，挡板上方）
+        x = canvas.width / 2;
+        y = canvas.height - paddleHeight - paddleBottomOffset - ballRadius - 10;
+        
+        // 随机角度（垂直线左右60度范围内）
+        const angle = (Math.random() * 120 - 60) * Math.PI / 180;
+        
+        // 初始速度大小
+        const speed = 5;
+        
+        // 计算速度分量
+        dx = speed * Math.sin(angle);
+        dy = -speed * Math.cos(angle);
+        
+        // 确保球不会水平或向下发射
+        if (Math.abs(dx) < 0.5) dx = dx < 0 ? -0.5 : 0.5;
+        if (dy >= 0) dy = -0.5;
+      }
+
+      // 绘制开始界面
+      function drawStartScreen() {
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.font = "48px Arial";
+        ctx.fillStyle = "#FFF";
+        ctx.textAlign = "center";
+        ctx.fillText("BREAKOUT GAME", canvas.width/2, canvas.height/2 - 60);
+        
+        ctx.font = "32px Arial";
+        ctx.fillText("Press Any Key to Start", canvas.width/2, canvas.height/2 + 40);
+      }
+
+      // 绘制结束界面
+      function drawGameOverScreen() {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.font = "48px Arial";
+        ctx.fillStyle = "#FF0000";
+        ctx.textAlign = "center";
+        ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2 - 60);
+        
+        ctx.font = "32px Arial";
+        ctx.fillStyle = "#FFF";
+        ctx.fillText("Score: " + finalScore, canvas.width/2, canvas.height/2);
+        
+        ctx.font = "24px Arial";
+        ctx.fillText("Press Any Key to Play Again", canvas.width/2, canvas.height/2 + 60);
+      }
+
+      // 绘制砖块
+      function drawBricks() {
+        for (var c = 0; c < brickColumnCount; c++) {
+          for (var r = 0; r < brickRowCount; r++) {
+            if (bricks[c][r].status == 1) {
+              var brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+              var brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+
+              bricks[c][r].x = brickX;
+              bricks[c][r].y = brickY;
+              ctx.beginPath();
+              ctx.rect(brickX, brickY, brickWidth, brickHeight);
+              ctx.fillStyle = "#0095DD";
+              ctx.fill();
+              ctx.closePath();
+            }
+          }
+        }
+      }
+
+      // 碰撞检测
+      function collisionDetection() {
+        for (var c = 0; c < brickColumnCount; c++) {
+          for (var r = 0; r < brickRowCount; r++) {
+            var b = bricks[c][r];
+            
+            if (b.status == 1) {
+              if (
+                x + ballRadius > b.x &&
+                x - ballRadius < b.x + brickWidth &&
+                y + ballRadius > b.y &&
+                y - ballRadius < b.y + brickHeight
+              ) {
+                var overlapX = Math.min(
+                  Math.abs(x + ballRadius - b.x),
+                  Math.abs(x - ballRadius - (b.x + brickWidth))
+                );
+                var overlapY = Math.min(
+                  Math.abs(y + ballRadius - b.y),
+                  Math.abs(y - ballRadius - (b.y + brickHeight))
+                );
+                
+                if (overlapX < overlapY) dx = -dx;
+                else dy = -dy;
+                
+                b.status = 0;
+                ballColor = getRandomColor();
+                score++;
+
+                if (score == brickRowCount * brickColumnCount) {
+                  gameState = GAME_STATE.OVER;
+                  finalScore = score;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 绘制分数
+      function drawScore() {
+        ctx.font = "32px Arial";
+        ctx.fillStyle = "#0095DD";
+        ctx.textAlign = "left";
+        ctx.fillText("Score: " + score, 16, 40);
+      }
+
+      // 绘制球
+      function drawBall() {
+        ctx.beginPath();
+        ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+        ctx.fillStyle = ballColor;
+        ctx.fill();
+        ctx.closePath();
+      }
+
+      // 绘制挡板
+      function drawPaddle() {
+        ctx.beginPath();
+        ctx.rect(paddleX, canvas.height - paddleHeight - paddleBottomOffset, paddleWidth, paddleHeight);
+        ctx.fillStyle = "#0095DD";
+        ctx.fill();
+        ctx.closePath();
+      }
+
+      // 随机颜色生成
+      function getRandomColor() {
+        var letters = '0123456789ABCDEF';
+        var color = '#';
+        for (var i = 0; i < 6; i++) {
+          color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+      }
+
+      // 键盘控制
+      function keyDownHandler(e) {
+        if (e.key === 'ArrowRight') rightPressed = true;
+        else if (e.key === 'ArrowLeft') leftPressed = true;
+        else if (gameState !== GAME_STATE.PLAYING) startGame();
+      }
+
+      function keyUpHandler(e) {
+        if (e.key === 'ArrowRight') rightPressed = false;
+        else if (e.key === 'ArrowLeft') leftPressed = false;
+      }
+
+      // 开始游戏
+      function startGame() {
+        if (gameState === GAME_STATE.OVER) {
+          finalScore = score;
+        }
+        
+        score = 0;
+        initBricks();
+        initBall();
+        gameState = GAME_STATE.PLAYING;
+      }
+
+      // 游戏结束
+      function gameOver() {
+        gameState = GAME_STATE.OVER;
+        finalScore = score;
+      }
+
+      // 主绘制函数
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        switch(gameState) {
+          case GAME_STATE.READY:
+            drawStartScreen();
+            break;
+            
+          case GAME_STATE.PLAYING:
+            drawBricks();
+            drawBall();
+            drawPaddle();
+            drawScore();
+            collisionDetection();
+
+            // 墙壁碰撞
+            if(x + dx > canvas.width - ballRadius || x + dx < ballRadius) {
+                dx = -dx;
+                ballColor = getRandomColor();
+            }
+            
+            // 顶部碰撞
+            if(y + dy < ballRadius) {
+                dy = -dy;
+                ballColor = getRandomColor();
+            } 
+            // 底部碰撞检测
+            else if (y + dy > canvas.height - ballRadius) {
+                gameOver();
+            }
+            // 挡板碰撞检测
+            else if (y + dy > canvas.height - paddleHeight - paddleBottomOffset - ballRadius && 
+                     y - dy < canvas.height - paddleBottomOffset + ballRadius) {
+                if (x > paddleX - ballRadius && x < paddleX + paddleWidth + ballRadius) {
+                    const hitPosition = ((x - paddleX) / paddleWidth * 2 - 1);
+                    const angle = hitPosition * Math.PI/3;
+                    const speed = Math.sqrt(dx*dx + dy*dy);
+                    dx = speed * Math.sin(angle);
+                    dy = -speed * Math.cos(angle);
+                    if(dy > 0) dy = -dy;
+                    dx *= 1.05;
+                    dy *= 1.05;
+                    y = canvas.height - paddleHeight - paddleBottomOffset - ballRadius - 1;
+                    ballColor = getRandomColor();
+                }
+            }
+
+            // 挡板移动
+            if (rightPressed && paddleX < canvas.width - paddleWidth) {
+                paddleX += 10;
+            } else if (leftPressed && paddleX > 0) {
+                paddleX -= 10;
+            }
+            
+            x += dx;
+            y += dy;
+            break;
+            
+          case GAME_STATE.OVER:
+            drawGameOverScreen();
+            break;
+        }
+        
+        requestAnimationFrame(draw);
+      }
+
+      // 事件监听
+      document.addEventListener("keydown", keyDownHandler, false);
+      document.addEventListener("keyup", keyUpHandler, false);
+
+      // 初始化游戏
+      initBricks();
+      draw();
+    </script>
+</body>
+</html>
